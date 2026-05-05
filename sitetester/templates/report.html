@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SiteTester Report — {{ meta.date }}</title>
+  <style>
+    :root {
+      --pass:    #16a34a;
+      --fail:    #dc2626;
+      --warn:    #d97706;
+      --bg:      #f1f5f9;
+      --card:    #ffffff;
+      --border:  #e2e8f0;
+      --text:    #0f172a;
+      --muted:   #64748b;
+      --header:  #1e293b;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+    a { color: inherit; }
+
+    /* ── Header ── */
+    .header {
+      background: var(--header);
+      color: #f8fafc;
+      padding: 20px 32px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .header h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+    .header .meta-line { margin-top: 6px; font-size: 12px; color: #94a3b8; line-height: 1.7; }
+    .header .meta-line a { color: #7dd3fc; }
+
+    /* ── Summary cards ── */
+    .summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      padding: 24px 32px 0;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 22px;
+      min-width: 130px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    }
+    .card .num  { font-size: 30px; font-weight: 800; line-height: 1; }
+    .card .lbl  { font-size: 11px; color: var(--muted); margin-top: 5px; text-transform: uppercase; letter-spacing: .05em; }
+    .card.pass  .num { color: var(--pass); }
+    .card.fail  .num { color: var(--fail); }
+    .card.warn  .num { color: var(--warn); }
+
+    /* ── Main table area ── */
+    .main { padding: 24px 32px 48px; }
+
+    /* Filter buttons */
+    .filters { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+    .fbtn {
+      padding: 5px 14px;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      background: var(--card);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      transition: all .15s;
+    }
+    .fbtn:hover { border-color: #94a3b8; }
+    .fbtn.active { background: var(--header); color: #fff; border-color: var(--header); }
+
+    /* Table */
+    .tbl-wrap {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,.07);
+    }
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      background: #f8fafc;
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    td { padding: 10px 14px; border-top: 1px solid var(--border); vertical-align: middle; }
+    tr.url-row { cursor: pointer; transition: background .1s; }
+    tr.url-row:hover { background: #f8fafc; }
+    .path-cell { font-family: monospace; font-size: 12px; color: #334155; max-width: 380px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* Badges */
+    .badge {
+      display: inline-flex; align-items: center;
+      padding: 2px 9px; border-radius: 20px;
+      font-size: 11px; font-weight: 700;
+    }
+    .badge.pass  { background: #dcfce7; color: var(--pass); }
+    .badge.fail  { background: #fee2e2; color: var(--fail); }
+    .badge.warn  { background: #fef9c3; color: var(--warn); }
+    .badge.info  { background: #e0f2fe; color: #0369a1;     }
+
+    .diff-val { font-weight: 700; font-size: 12px; }
+    .diff-val.ok   { color: var(--pass); }
+    .diff-val.warn { color: var(--warn); }
+    .diff-val.err  { color: var(--fail); }
+    .diff-val.na   { color: var(--muted); }
+
+    /* ── Detail panel ── */
+    tr.detail-row td { padding: 0; }
+    .detail-panel {
+      display: none;
+      padding: 20px 20px 24px;
+      background: #f8fafc;
+      border-top: 2px solid #cbd5e1;
+    }
+    .detail-panel.open { display: block; }
+
+    /* Mode tabs */
+    .mode-tabs {
+      display: inline-flex;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      overflow: hidden;
+      margin-bottom: 14px;
+    }
+    .mtab {
+      padding: 6px 18px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      background: var(--card);
+      border: none;
+      transition: all .15s;
+    }
+    .mtab:not(:first-child) { border-left: 1px solid var(--border); }
+    .mtab.active { background: var(--header); color: #fff; }
+
+    /* Screenshot viewer */
+    .viewer {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 900px) { .viewer { grid-template-columns: 1fr; } }
+    .vpanel {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--card);
+    }
+    .vpanel-head {
+      padding: 6px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: var(--muted);
+      background: #f1f5f9;
+      border-bottom: 1px solid var(--border);
+    }
+    .scroll-wrap {
+      max-height: 560px;
+      overflow-y: auto;
+      overflow-x: auto;
+    }
+    .scroll-wrap img { display: block; max-width: 100%; height: auto; }
+    .no-shot { padding: 20px; color: var(--muted); font-size: 12px; text-align: center; }
+
+    /* Issues sections */
+    .issues-block { margin-top: 16px; }
+    .issues-block h3 { font-size: 13px; font-weight: 700; margin-bottom: 8px; color: #334155; }
+    .issue-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+    .issue-item {
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--fail);
+      background: var(--card);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .issue-item.warn-item { border-left-color: var(--warn); }
+
+    .compare-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 6px;
+    }
+    .compare-box {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 6px 10px;
+      font-size: 11px;
+    }
+    .compare-box .clabel { font-weight: 600; color: var(--muted); text-transform: uppercase; font-size: 10px; }
+    .compare-box .cval  { margin-top: 2px; word-break: break-word; }
+
+    .hidden { display: none !important; }
+
+    /* Broken link table */
+    .link-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 6px; }
+    .link-table th { text-align: left; padding: 4px 8px; background: #f1f5f9; border: 1px solid var(--border); }
+    .link-table td { padding: 4px 8px; border: 1px solid var(--border); word-break: break-all; }
+    .status-err  { color: var(--fail); font-weight: 700; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════ HEADER ═══ -->
+<div class="header">
+  <div>
+    <h1>SiteTester — Regression Report</h1>
+    <div class="meta-line">
+      Generated: <strong>{{ meta.date }}</strong><br>
+      Original: <a href="{{ meta.original_url }}" target="_blank" rel="noopener">{{ meta.original_url }}</a><br>
+      Mirror:   <a href="{{ meta.mirror_url }}"   target="_blank" rel="noopener">{{ meta.mirror_url }}</a>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════ SUMMARY ═══ -->
+<div class="summary">
+  <div class="card">
+    <div class="num">{{ stats.total }}</div>
+    <div class="lbl">Pages Checked</div>
+  </div>
+  <div class="card pass">
+    <div class="num">{{ stats.passed }}</div>
+    <div class="lbl">Passed</div>
+  </div>
+  <div class="card fail">
+    <div class="num">{{ stats.failed }}</div>
+    <div class="lbl">Failed</div>
+  </div>
+  <div class="card warn">
+    <div class="num">{{ stats.visual_issues }}</div>
+    <div class="lbl">Visual Issues</div>
+  </div>
+  <div class="card warn">
+    <div class="num">{{ stats.content_issues }}</div>
+    <div class="lbl">Content Issues</div>
+  </div>
+  <div class="card fail">
+    <div class="num">{{ stats.broken_links }}</div>
+    <div class="lbl">Broken Links</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ MAIN TABLE ═══ -->
+<div class="main">
+  <div class="filters">
+    <button class="fbtn active" onclick="filterRows('all', this)">All ({{ stats.total }})</button>
+    <button class="fbtn"        onclick="filterRows('fail', this)">Failed ({{ stats.failed }})</button>
+    <button class="fbtn"        onclick="filterRows('pass', this)">Passed ({{ stats.passed }})</button>
+  </div>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Path</th>
+          <th>Status</th>
+          <th>Diff Desktop</th>
+          {% if check_mobile %}<th>Diff Mobile</th>{% endif %}
+          <th>Content</th>
+          <th>Links</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for r in results %}
+        {# ── summary row ── #}
+        <tr class="url-row"
+            data-status="{{ 'pass' if r.passed else 'fail' }}"
+            data-slug="{{ r.slug }}"
+            onclick="toggleDetail('{{ r.slug }}')">
+
+          <td style="color:var(--muted);font-size:12px">{{ loop.index }}</td>
+          <td class="path-cell" title="{{ r.path }}">{{ r.path }}</td>
+
+          <td>
+            <span class="badge {{ 'pass' if r.passed else 'fail' }}">
+              {{ 'PASS' if r.passed else 'FAIL' }}
+            </span>
+          </td>
+
+          {# desktop diff % #}
+          <td>
+            {% set vd = r.visual_desktop %}
+            {% if vd and vd.diff_pct is defined and vd.diff_pct >= 0 %}
+              {% if vd.diff_pct == 0 %}
+                <span class="diff-val ok">0 %</span>
+              {% elif vd.diff_pct <= threshold %}
+                <span class="diff-val warn">{{ vd.diff_pct }} %</span>
+              {% else %}
+                <span class="diff-val err">{{ vd.diff_pct }} %</span>
+              {% endif %}
+            {% else %}
+              <span class="diff-val na">—</span>
+            {% endif %}
+          </td>
+
+          {% if check_mobile %}
+          {# mobile diff % #}
+          <td>
+            {% set vm = r.visual_mobile %}
+            {% if vm and vm.diff_pct is defined and vm.diff_pct >= 0 %}
+              {% if vm.diff_pct == 0 %}
+                <span class="diff-val ok">0 %</span>
+              {% elif vm.diff_pct <= threshold %}
+                <span class="diff-val warn">{{ vm.diff_pct }} %</span>
+              {% else %}
+                <span class="diff-val err">{{ vm.diff_pct }} %</span>
+              {% endif %}
+            {% else %}
+              <span class="diff-val na">—</span>
+            {% endif %}
+          </td>
+          {% endif %}
+
+          {# content #}
+          <td>
+            {% if r.content and r.content.issues %}
+              <span class="badge fail">{{ r.content.issues | length }} issue(s)</span>
+            {% else %}
+              <span class="badge pass">OK</span>
+            {% endif %}
+          </td>
+
+          {# links #}
+          <td>
+            {% set bl = r.links.broken_links | default([]) %}
+            {% set wd = r.links.wrong_domain_links | default([]) %}
+            {% if bl or wd %}
+              <span class="badge fail">{{ (bl | length) + (wd | length) }} issue(s)</span>
+            {% else %}
+              <span class="badge pass">OK</span>
+            {% endif %}
+          </td>
+        </tr>
+
+        {# ── detail row ── #}
+        <tr class="detail-row" id="drow-{{ r.slug }}">
+          <td colspan="{{ 7 if check_mobile else 6 }}">
+            <div class="detail-panel" id="dpanel-{{ r.slug }}">
+
+              {# ── mode tabs ── #}
+              {% if check_mobile %}
+              <div class="mode-tabs">
+                <button class="mtab active" onclick="switchMode('{{ r.slug }}','desktop',this)">Desktop</button>
+                <button class="mtab"        onclick="switchMode('{{ r.slug }}','mobile',this)">Mobile</button>
+              </div>
+              {% endif %}
+
+              {# ── desktop viewer ── #}
+              <div id="vdesktop-{{ r.slug }}" class="viewer-mode">
+                <div class="viewer">
+                  <div class="vpanel">
+                    <div class="vpanel-head">Original (Desktop)</div>
+                    <div class="scroll-wrap" data-sg="desk-{{ r.slug }}">
+                      {% if r.screenshots.original_desktop_ok %}
+                        <img src="screenshots/{{ r.slug }}/original_desktop.png" loading="lazy">
+                      {% else %}
+                        <div class="no-shot">Screenshot unavailable</div>
+                      {% endif %}
+                    </div>
+                  </div>
+
+                  <div class="vpanel">
+                    <div class="vpanel-head">
+                      Diff Overlay
+                      {% set vd = r.visual_desktop %}
+                      {% if vd and vd.diff_pct is defined and vd.diff_pct >= 0 %}
+                        — <span class="diff-val {% if vd.diff_pct == 0 %}ok{% elif vd.diff_pct <= threshold %}warn{% else %}err{% endif %}">{{ vd.diff_pct }}%</span>
+                      {% endif %}
+                    </div>
+                    <div class="scroll-wrap" data-sg="desk-{{ r.slug }}">
+                      {% if r.visual_desktop and r.visual_desktop.diff_image %}
+                        <img src="screenshots/{{ r.slug }}/diff_desktop.png" loading="lazy">
+                      {% else %}
+                        <div class="no-shot">Diff unavailable</div>
+                      {% endif %}
+                    </div>
+                  </div>
+
+                  <div class="vpanel">
+                    <div class="vpanel-head">Mirror (Desktop)</div>
+                    <div class="scroll-wrap" data-sg="desk-{{ r.slug }}">
+                      {% if r.screenshots.mirror_desktop_ok %}
+                        <img src="screenshots/{{ r.slug }}/mirror_desktop.png" loading="lazy">
+                      {% else %}
+                        <div class="no-shot">Screenshot unavailable</div>
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {# ── mobile viewer (hidden by default) ── #}
+              {% if check_mobile %}
+              <div id="vmobile-{{ r.slug }}" class="viewer-mode hidden">
+                <div class="viewer">
+                  <div class="vpanel">
+                    <div class="vpanel-head">Original (Mobile)</div>
+                    <div class="scroll-wrap" data-sg="mob-{{ r.slug }}">
+                      {% if r.screenshots.get('original_mobile_ok') %}
+                        <img src="screenshots/{{ r.slug }}/original_mobile.png" loading="lazy">
+                      {% else %}
+                        <div class="no-shot">Screenshot unavailable</div>
+                      {% endif %}
+                    </div>
+                  </div>
+
+                  <div class="vpanel">
+                    <div class="vpanel-head">
+                      Diff Overlay (Mobile)
+                      {% set vm = r.visual_mobile %}
+                      {% if vm and vm.diff_pct is defined and vm.diff_pct >= 0 %}
+                        — <span class="diff-val {% if vm.diff_pct == 0 %}ok{% elif vm.diff_pct <= threshold %}warn{% else %}err{% endif %}">{{ vm.diff_pct }}%</span>
+                      {% endif %}
+                    </div>
+                    <div class="scroll-wrap" data-sg="mob-{{ r.slug }}">
+                      {% if r.visual_mobile and r.visual_mobile.diff_image %}
+                        <img src="screenshots/{{ r.slug }}/diff_mobile.png" loading="lazy">
+                      {% else %}
+                        <div class="no-shot">Diff unavailable</div>
+                      {% endif %}
+                    </div>
+                  </div>
+
+                  <div class="vpanel">
+                    <div class="vpanel-head">Mirror (Mobile)</div>
+                    <div class="scroll-wrap" data-sg="mob-{{ r.slug }}">
+                      {% if r.screenshots.get('mirror_mobile_ok') %}
+                        <img src="screenshots/{{ r.slug }}/mirror_mobile.png" loading="lazy">
+                      {% else %}
+                        <div class="no-shot">Screenshot unavailable</div>
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {% endif %}
+
+              {# ── Content & SEO issues ── #}
+              {% if r.content and r.content.issues %}
+              <div class="issues-block">
+                <h3>Content &amp; SEO Issues</h3>
+                <ul class="issue-list">
+                {% for issue in r.content.issues %}
+                  <li class="issue-item">
+                    {% if issue.type == 'meta' %}
+                      <strong>Meta &lt;{{ issue.field }}&gt; mismatch</strong>
+                      <div class="compare-grid">
+                        <div class="compare-box">
+                          <div class="clabel">Original</div>
+                          <div class="cval">{{ issue.original or '(empty)' }}</div>
+                        </div>
+                        <div class="compare-box">
+                          <div class="clabel">Mirror</div>
+                          <div class="cval">{{ issue.mirror or '(empty)' }}</div>
+                        </div>
+                      </div>
+                    {% elif issue.type == 'headings' %}
+                      <strong>Heading structure differs</strong> —
+                      original has {{ issue.orig_count }} heading(s), mirror has {{ issue.mirror_count }}.
+                      {% if issue.original %}
+                      <div style="margin-top:6px;font-size:11px;color:var(--muted)">
+                        Original: {% for h in issue.original[:5] %}{{ h.level }}: "{{ h.text[:60] }}"{% if not loop.last %}, {% endif %}{% endfor %}{% if issue.original|length > 5 %} …{% endif %}
+                      </div>
+                      {% endif %}
+                    {% elif issue.type == 'images_alt' %}
+                      <strong>Missing <code>alt</code> attribute</strong> on {{ issue.total_missing }} image(s):
+                      <div style="margin-top:4px;font-size:11px;color:var(--muted)">
+                        {{ issue.missing | join(', ') }}{% if issue.total_missing > issue.missing|length %} … and {{ issue.total_missing - issue.missing|length }} more{% endif %}
+                      </div>
+                    {% else %}
+                      {{ issue }}
+                    {% endif %}
+                  </li>
+                {% endfor %}
+                </ul>
+              </div>
+              {% endif %}
+
+              {# ── Link issues ── #}
+              {% set bl  = r.links.broken_links       | default([]) %}
+              {% set wd  = r.links.wrong_domain_links | default([]) %}
+              {% set me  = r.links.missing_external   | default([]) %}
+
+              {% if bl or wd or me %}
+              <div class="issues-block">
+                <h3>Link Issues</h3>
+
+                {% if bl %}
+                <p style="font-size:12px;margin-bottom:6px;color:var(--fail);font-weight:600">
+                  {{ bl | length }} broken link(s) (4xx / 5xx / unreachable)
+                </p>
+                <table class="link-table">
+                  <thead><tr><th>Status</th><th>URL</th></tr></thead>
+                  <tbody>
+                  {% for lnk in bl %}
+                    <tr>
+                      <td class="status-err">{{ lnk.status }}</td>
+                      <td><a href="{{ lnk.url }}" target="_blank" rel="noopener">{{ lnk.url }}</a></td>
+                    </tr>
+                  {% endfor %}
+                  </tbody>
+                </table>
+                {% endif %}
+
+                {% if wd %}
+                <p style="font-size:12px;margin:10px 0 6px;color:var(--warn);font-weight:600">
+                  {{ wd | length }} link(s) on mirror still pointing to the original domain
+                </p>
+                <ul class="issue-list">
+                {% for url in wd %}
+                  <li class="issue-item warn-item" style="font-family:monospace;font-size:11px">{{ url }}</li>
+                {% endfor %}
+                </ul>
+                {% endif %}
+
+                {% if me %}
+                <p style="font-size:12px;margin:10px 0 6px;color:var(--muted);font-weight:600">
+                  {{ me | length }} external link path(s) missing on mirror
+                </p>
+                <ul class="issue-list">
+                {% for p in me %}
+                  <li class="issue-item warn-item" style="font-family:monospace;font-size:11px">{{ p }}</li>
+                {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              {% endif %}
+
+            </div>{# /detail-panel #}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ JS ═══ -->
+<script>
+/* ─── Row toggle ─── */
+function toggleDetail(slug) {
+  const panel = document.getElementById('dpanel-' + slug);
+  const wasOpen = panel.classList.contains('open');
+  panel.classList.toggle('open');
+  if (!wasOpen) initScrollSync(slug);
+}
+
+/* ─── Mode switch (Desktop / Mobile) ─── */
+function switchMode(slug, mode, btn) {
+  btn.closest('.mode-tabs').querySelectorAll('.mtab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const desk = document.getElementById('vdesktop-' + slug);
+  const mob  = document.getElementById('vmobile-'  + slug);
+  if (mode === 'desktop') { desk.classList.remove('hidden'); mob.classList.add('hidden'); }
+  else                    { mob.classList.remove('hidden');  desk.classList.add('hidden'); }
+}
+
+/* ─── Filter rows ─── */
+function filterRows(status, btn) {
+  document.querySelectorAll('.fbtn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('tr.url-row').forEach(row => {
+    const visible = status === 'all' || row.dataset.status === status;
+    row.style.display = visible ? '' : 'none';
+    const slug = row.dataset.slug;
+    const drow = document.getElementById('drow-' + slug);
+    if (drow) drow.style.display = visible ? '' : 'none';
+  });
+}
+
+/* ─── Synchronised scroll within a viewer group ─── */
+const _syncInited = new Set();
+function initScrollSync(slug) {
+  if (_syncInited.has(slug)) return;
+  _syncInited.add(slug);
+
+  const panel = document.getElementById('dpanel-' + slug);
+  const groups = {};
+  panel.querySelectorAll('[data-sg]').forEach(el => {
+    const g = el.dataset.sg;
+    if (!groups[g]) groups[g] = [];
+    groups[g].push(el);
+  });
+
+  Object.values(groups).forEach(els => {
+    els.forEach(el => {
+      el.addEventListener('scroll', function () {
+        els.forEach(peer => {
+          if (peer !== this) peer.scrollTop = this.scrollTop;
+        });
+      });
+    });
+  });
+}
+</script>
+</body>
+</html>
