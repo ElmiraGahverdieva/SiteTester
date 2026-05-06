@@ -1,9 +1,9 @@
 @echo off
-chcp 65001 >nul
 cd /d "%~dp0"
 
 if not exist venv\Scripts\activate (
-    echo  Окружение не найдено. Сначала запустите install.bat
+    echo [ERROR] Virtual environment not found.
+    echo Please run install.bat first.
     pause
     exit /b 1
 )

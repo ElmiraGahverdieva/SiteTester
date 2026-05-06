@@ -1,74 +1,65 @@
 @echo off
-chcp 65001 >nul
-echo.
-echo  ╔══════════════════════════════════════╗
-echo  ║      SiteTester — Установка          ║
-echo  ╚══════════════════════════════════════╝
-echo.
-
-REM Переходим в папку скрипта
 cd /d "%~dp0"
 
-REM ── Проверяем Python ─────────────────────────────────────────────────────
+echo ======================================
+echo   SiteTester - Installation
+echo ======================================
+echo.
+
 python --version >nul 2>&1
 if %errorlevel% neq 0 (
-    echo  [ОШИБКА] Python не найден!
+    echo [ERROR] Python not found!
     echo.
-    echo  Скачайте и установите Python 3.11 или новее:
-    echo  https://www.python.org/downloads/
+    echo Please download and install Python 3.11+:
+    echo https://www.python.org/downloads/
     echo.
-    echo  ВАЖНО: при установке отметьте галочку
-    echo         "Add Python to PATH"
+    echo IMPORTANT: check "Add Python to PATH" during install
     echo.
     pause
     exit /b 1
 )
-for /f "tokens=*" %%i in ('python --version') do echo  Python: %%i
 
-REM ── Создаём виртуальное окружение ────────────────────────────────────────
+python --version
+
 echo.
-echo  [1/4] Создание виртуального окружения...
+echo [1/4] Creating virtual environment...
 if exist venv (
-    echo        Уже существует, пропускаем.
+    echo        Already exists, skipping.
 ) else (
     python -m venv venv
     if %errorlevel% neq 0 (
-        echo  [ОШИБКА] Не удалось создать окружение
+        echo [ERROR] Failed to create venv
         pause & exit /b 1
     )
 )
 
-REM ── Устанавливаем зависимости ─────────────────────────────────────────────
 echo.
-echo  [2/4] Установка зависимостей...
+echo [2/4] Installing dependencies...
 call venv\Scripts\activate
-pip install --upgrade pip -q
+python -m pip install --upgrade pip -q
 pip install -r requirements.txt
 if %errorlevel% neq 0 (
-    echo  [ОШИБКА] Ошибка установки зависимостей
+    echo [ERROR] Failed to install dependencies
     pause & exit /b 1
 )
 
-REM ── Устанавливаем браузер ─────────────────────────────────────────────────
 echo.
-echo  [3/4] Установка браузера Chromium...
+echo [3/4] Installing Chromium browser...
 playwright install chromium
 if %errorlevel% neq 0 (
-    echo  [ОШИБКА] Не удалось установить Chromium
+    echo [ERROR] Failed to install Chromium
     pause & exit /b 1
 )
 
-REM ── Готово ───────────────────────────────────────────────────────────────
 echo.
-echo  [4/4] Проверка установки...
-python -c "import playwright, flask, PIL, numpy; print('  OK')"
+echo [4/4] Checking installation...
+python -c "import playwright, flask, PIL, numpy; print('  All OK')"
 
 echo.
-echo  ╔══════════════════════════════════════╗
-echo  ║   ✅  Установка завершена!           ║
-echo  ║                                      ║
-echo  ║   Для запуска дважды кликните на:    ║
-echo  ║   SiteTester.bat                     ║
-echo  ╚══════════════════════════════════════╝
+echo ======================================
+echo   Installation complete!
+echo.
+echo   To start: double-click SiteTester.bat
+echo ======================================
 echo.
 pause
