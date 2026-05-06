@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SiteTester</title>
+  <style>
+    :root {
+      --bg:       #f0f4f8;
+      --surface:  #ffffff;
+      --border:   #dde3ec;
+      --text:     #1a202c;
+      --muted:    #718096;
+      --primary:  #4f46e5;
+      --primary-h:#4338ca;
+      --success:  #059669;
+      --danger:   #dc2626;
+      --warn:     #d97706;
+      --radius:   12px;
+      --shadow:   0 2px 12px rgba(0,0,0,.08);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* ── Шапка ── */
+    header {
+      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+      color: #fff; padding: 20px 32px;
+      display: flex; align-items: center; gap: 16px;
+    }
+    .logo { font-size: 28px; }
+    header h1 { font-size: 20px; font-weight: 700; }
+    header p  { font-size: 13px; opacity: .8; margin-top: 2px; }
+
+    /* ── Основной контейнер ── */
+    .container { max-width: 900px; margin: 0 auto; padding: 28px 20px 60px; }
+
+    /* ── Карточка ── */
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); box-shadow: var(--shadow);
+      padding: 24px; margin-bottom: 18px;
+    }
+    .card-title { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 16px; }
+
+    /* ── URL-блок ── */
+    .url-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center; }
+    .url-arrow { font-size: 22px; color: var(--muted); text-align: center; user-select: none; }
+    .url-field label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .05em; }
+    .url-field input {
+      width: 100%; padding: 11px 14px; font-size: 14px;
+      border: 2px solid var(--border); border-radius: 8px;
+      outline: none; transition: border-color .15s;
+    }
+    .url-field input:focus { border-color: var(--primary); }
+    .url-field.orig input:focus { border-color: #2563eb; }
+    .url-field.mirror input:focus { border-color: #7c3aed; }
+
+    /* ── Настройки ── */
+    details.settings summary {
+      cursor: pointer; font-size: 13px; font-weight: 700;
+      color: var(--primary); padding: 14px 20px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); box-shadow: var(--shadow);
+      list-style: none; display: flex; align-items: center; gap: 8px;
+      user-select: none; margin-bottom: 0;
+    }
+    details.settings summary::before { content: '▸'; transition: transform .2s; }
+    details.settings[open] summary::before { transform: rotate(90deg); }
+    details.settings[open] summary { border-radius: var(--radius) var(--radius) 0 0; border-bottom: none; margin-bottom: 0; }
+    .settings-body {
+      background: var(--surface); border: 1px solid var(--border);
+      border-top: none; border-radius: 0 0 var(--radius) var(--radius);
+      padding: 20px; margin-bottom: 18px;
+    }
+    .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 600px) { .settings-grid { grid-template-columns: 1fr; } .url-grid { grid-template-columns: 1fr; } .url-arrow { display: none; } }
+    .field label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+    .field input, .field select, .field textarea {
+      width: 100%; padding: 9px 12px; font-size: 13px;
+      border: 1.5px solid var(--border); border-radius: 8px;
+      outline: none; background: var(--bg); transition: border-color .15s;
+    }
+    .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--primary); background: #fff; }
+    .field textarea { resize: vertical; font-family: monospace; }
+    .field.full { grid-column: 1 / -1; }
+    .checkbox-label { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13px; font-weight: 500; }
+    .checkbox-label input[type=checkbox] { width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary); }
+    .hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+    /* ── Кнопки ── */
+    .actions { display: flex; gap: 12px; margin-bottom: 18px; }
+    .btn {
+      padding: 12px 28px; border: none; border-radius: 10px;
+      font-size: 15px; font-weight: 700; cursor: pointer;
+      transition: all .15s; display: flex; align-items: center; gap: 8px;
+    }
+    .btn-primary { background: var(--primary); color: #fff; flex: 1; justify-content: center; }
+    .btn-primary:hover:not(:disabled) { background: var(--primary-h); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(79,70,229,.35); }
+    .btn-primary:disabled { opacity: .55; cursor: not-allowed; transform: none; box-shadow: none; }
+    .btn-primary.running { background: #6b7280; }
+    .btn-report { background: var(--success); color: #fff; }
+    .btn-report:hover { background: #047857; transform: translateY(-1px); }
+    .btn-report:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-stop { background: var(--danger); color: #fff; }
+
+    /* Спиннер */
+    .spinner { width: 18px; height: 18px; border: 3px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; flex-shrink: 0; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Прогресс ── */
+    .progress-bar { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; margin-bottom: 18px; display: none; }
+    .progress-bar.visible { display: block; }
+    .progress-fill { height: 100%; width: 0; background: linear-gradient(90deg, #4f46e5, #7c3aed); border-radius: 2px; transition: width .4s; animation: indeterminate 1.4s ease infinite; }
+    @keyframes indeterminate { 0% { width: 0; margin-left: 0; } 50% { width: 60%; margin-left: 20%; } 100% { width: 0; margin-left: 100%; } }
+
+    /* ── Статус-бейдж ── */
+    .status-badge {
+      display: none; padding: 6px 14px; border-radius: 20px;
+      font-size: 12px; font-weight: 700; margin-bottom: 18px;
+    }
+    .status-badge.visible { display: inline-flex; align-items: center; gap: 6px; }
+    .status-badge.running { background: #ede9fe; color: var(--primary); }
+    .status-badge.done    { background: #d1fae5; color: var(--success); }
+    .status-badge.error   { background: #fee2e2; color: var(--danger); }
+
+    /* ── Консоль ── */
+    .console-wrap { background: #1a1a2e; border-radius: var(--radius); overflow: hidden; }
+    .console-header { padding: 10px 16px; background: #16213e; display: flex; align-items: center; justify-content: space-between; }
+    .console-title { color: #94a3b8; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+    .console-dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; animation: blink 1.2s ease-in-out infinite; display: none; }
+    .console-dot.active { display: block; }
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+    .console-body {
+      height: 280px; overflow-y: auto; padding: 12px 16px;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: 12px; line-height: 1.7;
+    }
+    .log-line { color: #a8b3cf; }
+    .log-line.step { color: #818cf8; font-weight: 600; }
+    .log-line.page { color: #34d399; }
+    .log-line.warn { color: #fbbf24; }
+    .log-line.error-line { color: #f87171; }
+    .log-line.done-line { color: #4ade80; font-weight: 700; font-size: 13px; }
+    .log-placeholder { color: #4a5568; font-style: italic; }
+
+    /* ── Баннер результата ── */
+    .result-banner { display: none; border-radius: var(--radius); padding: 16px 20px; margin-bottom: 18px; }
+    .result-banner.visible { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .result-banner.ok   { background: #d1fae5; border: 1.5px solid #6ee7b7; }
+    .result-banner.fail { background: #fee2e2; border: 1.5px solid #fca5a5; }
+    .result-banner .rb-text { font-size: 14px; font-weight: 600; }
+    .result-banner.ok   .rb-text { color: #065f46; }
+    .result-banner.fail .rb-text { color: #991b1b; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🔍</div>
+  <div>
+    <h1>SiteTester</h1>
+    <p>Автоматическое сравнение двух сайтов — визуал, текст, ссылки, SEO</p>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- ── URL ── -->
+  <div class="card">
+    <div class="card-title">Сайты для сравнения</div>
+    <div class="url-grid">
+      <div class="url-field orig">
+        <label>🌐 Оригинальный сайт</label>
+        <input type="url" id="original_url" placeholder="https://example.com" autocomplete="url">
+      </div>
+      <div class="url-arrow">→</div>
+      <div class="url-field mirror">
+        <label>🪞 Зеркало / копия</label>
+        <input type="url" id="mirror_url" placeholder="https://mirror.example.com" autocomplete="url">
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Настройки ── -->
+  <details class="settings">
+    <summary>⚙️ Настройки проверки</summary>
+    <div class="settings-body">
+      <div class="settings-grid">
+
+        <div class="field">
+          <label>Максимум страниц</label>
+          <input type="number" id="max_pages" value="50" min="1" max="1000">
+          <div class="hint">Чем больше — тем дольше проверка</div>
+        </div>
+
+        <div class="field">
+          <label>Режим сбора URL</label>
+          <select id="mode">
+            <option value="both">Sitemap + краулер (рекомендуется)</option>
+            <option value="sitemap">Только sitemap.xml</option>
+            <option value="crawl">Только краулер (переход по ссылкам)</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Порог визуальных отличий (%)</label>
+          <input type="number" id="threshold" value="8" min="0" max="100" step="1">
+          <div class="hint">Выше порога → красный, ниже → жёлтый. Увеличьте если слишком много красного</div>
+        </div>
+
+        <div class="field">
+          <label>Радиус размытия (px)</label>
+          <input type="number" id="blur" value="4" min="0" max="20">
+          <div class="hint">Гасит пиксельные смещения. 0 = точное сравнение</div>
+        </div>
+
+        <div class="field">
+          <label style="margin-bottom:10px">Дополнительно</label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="check_mobile" checked>
+            Проверять мобильную версию (375px)
+          </label>
+        </div>
+
+        <div class="field">
+          <label>Папка для отчёта</label>
+          <input type="text" id="output_dir" value="output">
+          <div class="hint">Относительный или абсолютный путь</div>
+        </div>
+
+        <div class="field full">
+          <label>CSS-селекторы для скрытия (один на строку)</label>
+          <textarea id="exclude" rows="3" placeholder=".live-chat&#10;#cookie-banner&#10;.promo-popup"></textarea>
+          <div class="hint">Эти элементы будут скрыты перед скриншотом</div>
+        </div>
+
+      </div>
+    </div>
+  </details>
+
+  <!-- ── Кнопки ── -->
+  <div class="actions">
+    <button class="btn btn-primary" id="btn-start" onclick="startCheck()">
+      <span id="btn-icon">▶</span>
+      <span id="btn-text">Запустить проверку</span>
+    </button>
+    <button class="btn btn-report" id="btn-report" onclick="openReport()" disabled>
+      📊 Открыть отчёт
+    </button>
+  </div>
+
+  <!-- Прогресс-бар -->
+  <div class="progress-bar" id="progress-bar">
+    <div class="progress-fill"></div>
+  </div>
+
+  <!-- Баннер результата -->
+  <div class="result-banner" id="result-banner">
+    <span class="rb-text" id="result-text"></span>
+    <button class="btn btn-report" onclick="openReport()" style="padding:8px 20px;font-size:13px">
+      📊 Открыть отчёт
+    </button>
+  </div>
+
+  <!-- ── Консоль ── -->
+  <div class="console-wrap">
+    <div class="console-header">
+      <span class="console-title">Консоль</span>
+      <div class="console-dot" id="console-dot"></div>
+    </div>
+    <div class="console-body" id="console-body">
+      <div class="log-placeholder">Консоль пуста. Запустите проверку.</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let _es = null;
+let _reportReady = false;
+
+function startCheck() {
+  const orig   = document.getElementById('original_url').value.trim();
+  const mirror = document.getElementById('mirror_url').value.trim();
+
+  if (!orig || !mirror) {
+    alert('Укажите оба URL перед запуском');
+    return;
+  }
+  if (!orig.startsWith('http') || !mirror.startsWith('http')) {
+    alert('URL должен начинаться с http:// или https://');
+    return;
+  }
+
+  const payload = {
+    original_url: orig,
+    mirror_url:   mirror,
+    max_pages:    document.getElementById('max_pages').value,
+    mode:         document.getElementById('mode').value,
+    threshold:    document.getElementById('threshold').value,
+    blur:         document.getElementById('blur').value,
+    sensitivity:  25,
+    check_mobile: document.getElementById('check_mobile').checked,
+    exclude:      document.getElementById('exclude').value,
+    output_dir:   document.getElementById('output_dir').value || 'output',
+  };
+
+  // Сбрасываем UI
+  setRunning(true);
+  clearConsole();
+  hideResult();
+  _reportReady = false;
+  document.getElementById('btn-report').disabled = true;
+
+  // Стартуем SSE-лог
+  startLogStream();
+
+  fetch('/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.error) {
+      addLog('❌ ' + d.error, 'error-line');
+      setRunning(false);
+    }
+  })
+  .catch(e => {
+    addLog('❌ Ошибка запроса: ' + e, 'error-line');
+    setRunning(false);
+  });
+}
+
+function startLogStream() {
+  if (_es) { _es.close(); _es = null; }
+  _es = new EventSource('/logs');
+
+  _es.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === 'ping' || msg.type === 'connected') return;
+
+    if (msg.type === 'done') {
+      addLog(msg.text, 'done-line');
+      setRunning(false);
+      checkForReport();
+      _es.close();
+      return;
+    }
+    if (msg.type === 'error') {
+      addLog(msg.text, 'error-line');
+      return;
+    }
+
+    // Классифицируем строку лога
+    const t = msg.text;
+    let cls = 'log-line';
+    if (t.match(/^\[[\d]\/[\d]\]/))   cls = 'log-line step';
+    else if (t.startsWith('  →'))     cls = 'log-line page';
+    else if (t.includes('ПРЕДУПРЕЖ')) cls = 'log-line warn';
+    else if (t.includes('Ошибка') || t.includes('ERROR')) cls = 'log-line error-line';
+    addLog(t, cls);
+  };
+
+  _es.onerror = () => {
+    _es.close();
+    if (_state_running) setRunning(false);
+  };
+}
+
+let _state_running = false;
+
+function setRunning(running) {
+  _state_running = running;
+  const btnStart = document.getElementById('btn-start');
+  const btnIcon  = document.getElementById('btn-icon');
+  const btnText  = document.getElementById('btn-text');
+  const progress = document.getElementById('progress-bar');
+  const dot      = document.getElementById('console-dot');
+
+  btnStart.disabled = running;
+  btnStart.classList.toggle('running', running);
+  progress.classList.toggle('visible', running);
+  dot.classList.toggle('active', running);
+
+  if (running) {
+    btnIcon.outerHTML = '<div class="spinner" id="btn-icon"></div>';
+    btnText.textContent = 'Выполняется...';
+  } else {
+    const icon = document.getElementById('btn-icon');
+    if (icon) icon.outerHTML = '<span id="btn-icon">▶</span>';
+    btnText.textContent = 'Запустить проверку';
+  }
+}
+
+function checkForReport() {
+  fetch('/status')
+    .then(r => r.json())
+    .then(d => {
+      if (d.report_path) {
+        _reportReady = true;
+        document.getElementById('btn-report').disabled = false;
+        showResult(!d.error);
+      } else if (d.error) {
+        showResult(false, d.error);
+      }
+    });
+}
+
+function openReport() {
+  fetch('/open_report')
+    .then(r => r.json())
+    .then(d => { if (d.error) alert(d.error); });
+}
+
+function showResult(success, errorText) {
+  const banner  = document.getElementById('result-banner');
+  const resText = document.getElementById('result-text');
+  banner.className = 'result-banner visible ' + (success ? 'ok' : 'fail');
+  resText.textContent = success
+    ? '✅ Проверка завершена — откройте отчёт для результатов'
+    : ('❌ ' + (errorText || 'Произошла ошибка'));
+}
+
+function hideResult() {
+  document.getElementById('result-banner').className = 'result-banner';
+}
+
+function clearConsole() {
+  document.getElementById('console-body').innerHTML =
+    '<div class="log-placeholder">Запуск...</div>';
+}
+
+let _firstLog = true;
+function addLog(text, cls) {
+  const body = document.getElementById('console-body');
+  if (_firstLog) { body.innerHTML = ''; _firstLog = false; }
+  _firstLog = false;
+  const div = document.createElement('div');
+  div.className = cls || 'log-line';
+  div.textContent = text;
+  body.appendChild(div);
+  body.scrollTop = body.scrollHeight;
+}
+
+// Восстанавливаем статус после перезагрузки страницы
+fetch('/status').then(r => r.json()).then(d => {
+  if (d.running) {
+    setRunning(true);
+    startLogStream();
+  } else if (d.report_path) {
+    _reportReady = true;
+    document.getElementById('btn-report').disabled = false;
+  }
+});
+</script>
+</body>
+</html>

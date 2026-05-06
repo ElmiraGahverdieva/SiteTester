@@ -101,12 +101,12 @@ def annotate_screenshot(
 
         # Пытаемся загрузить читаемый шрифт; падаем на встроенный
         try:
-            font_big   = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 18)
-            font_small = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 13)
+            font_big   = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 28)
+            font_small = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 18)
         except Exception:
             try:
-                font_big   = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 18)
-                font_small = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 13)
+                font_big   = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 28)
+                font_small = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
             except Exception:
                 font_big = font_small = ImageFont.load_default()
 
