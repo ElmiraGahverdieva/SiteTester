@@ -265,14 +265,36 @@
                   </div>
 
                   {# Аннотированный скриншот — если есть отсутствующие ссылки #}
-                  {% if r.links.has_annotated %}
-                  <p style="font-size:12px;color:var(--muted);margin-bottom:8px">
-                    🔴 Красные рамки на оригинале показывают, где отсутствующие ссылки
-                  </p>
-                  <div class="vpanel" style="max-width:600px">
-                    <div class="vphead">Оригинал с метками отсутствующих ссылок</div>
-                    <div class="scroll-wrap">
-                      <img src="screenshots/{{ r.slug }}/annotated_desktop.png" loading="lazy">
+                  {% set ml = r.links.missing_links | default([]) %}
+                  {% if r.links.has_annotated and ml %}
+                  <div style="margin-top:16px;border:2px solid var(--fail);border-radius:10px;overflow:hidden;background:var(--card);">
+                    <div style="background:#dc2626;color:#fff;padding:10px 16px;display:flex;align-items:center;gap:12px;">
+                      <span style="font-size:22px;font-weight:900;background:rgba(0,0,0,.25);border-radius:6px;padding:2px 12px;">{{ ml|length }}</span>
+                      <div>
+                        <div style="font-size:14px;font-weight:700;">отсутствующих ссылок на зеркале</div>
+                        <div style="font-size:12px;opacity:.85">Пронумерованные рамки показывают их расположение на странице оригинала</div>
+                      </div>
+                    </div>
+
+                    <div style="display:grid;grid-template-columns:1fr 320px;gap:0">
+                      <div class="scroll-wrap" style="max-height:600px;border-right:1px solid var(--border)">
+                        <img src="screenshots/{{ r.slug }}/annotated_desktop.png" loading="lazy" style="max-width:100%">
+                      </div>
+                      <div style="padding:14px;overflow-y:auto;max-height:600px;background:#fff8f8;">
+                        <p style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:10px;">Список отсутствующих</p>
+                        {% for lnk in ml %}
+                        <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border);">
+                          <span style="flex-shrink:0;width:24px;height:24px;border-radius:5px;background:#dc2626;color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;">{{ loop.index }}</span>
+                          <div style="font-size:12px;min-width:0;">
+                            <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="{{ lnk.abs_href }}">
+                              {{ lnk.text or lnk.abs_href }}
+                            </div>
+                            <div style="color:var(--muted);font-family:monospace;font-size:10px;margin-top:2px;word-break:break-all;">{{ lnk.expected_url }}</div>
+                            <span style="display:inline-block;margin-top:3px;padding:1px 7px;border-radius:4px;background:#eff6ff;color:#2563eb;font-size:10px;font-weight:600;">~{{ lnk.y_pct }}% от верха</span>
+                          </div>
+                        </div>
+                        {% endfor %}
+                      </div>
                     </div>
                   </div>
                   {% endif %}

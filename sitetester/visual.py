@@ -87,25 +87,70 @@ def annotate_screenshot(
     output_path: Path,
 ) -> bool:
     """
-    Рисует красные рамки на скриншоте в местах отсутствующих элементов.
-    Сохраняет результат в output_path.
+    Рисует яркие пронумерованные рамки на скриншоте для каждого
+    отсутствующего элемента. Номер и текст ссылки — в метке над рамкой.
     """
     try:
-        img = Image.open(screenshot_path).convert("RGBA")
-        overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
-        draw = ImageDraw.Draw(overlay)
+        from PIL import ImageFont
 
-        for elem in elements:
-            x = int(elem.get("x", 0))
-            y = int(elem.get("y", 0))
-            w = max(int(elem.get("w", 60)), 10)
-            h = max(int(elem.get("h", 20)), 8)
-            draw.rectangle(
-                [x, y, x + w, y + h],
-                fill=(255, 30, 30, 65),
-                outline=(220, 0, 0, 255),
-                width=3,
-            )
+        img  = Image.open(screenshot_path).convert("RGBA")
+        W, H = img.size
+
+        overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        draw    = ImageDraw.Draw(overlay)
+
+        # Пытаемся загрузить читаемый шрифт; падаем на встроенный
+        try:
+            font_big   = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 18)
+            font_small = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 13)
+        except Exception:
+            try:
+                font_big   = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 18)
+                font_small = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 13)
+            except Exception:
+                font_big = font_small = ImageFont.load_default()
+
+        for i, elem in enumerate(elements, 1):
+            x = max(int(elem.get("x", 0)), 0)
+            y = max(int(elem.get("y", 0)), 0)
+            w = max(int(elem.get("w", 120)), 30)
+            h = max(int(elem.get("h", 24)), 14)
+
+            # Ограничиваем по размеру страницы
+            x2 = min(x + w, W - 1)
+            y2 = min(y + h, H - 1)
+
+            # Яркая полупрозрачная заливка
+            draw.rectangle([x, y, x2, y2], fill=(255, 0, 0, 90))
+            # Жирная рамка — 5 пикселей
+            for off in range(5):
+                draw.rectangle([x - off, y - off, x2 + off, y2 + off],
+                               outline=(220, 0, 0, 255))
+
+            # Метка с номером над рамкой
+            label_text = f" {i} "
+            link_text  = (elem.get("text") or elem.get("abs_href") or "")[:40]
+
+            lx = x
+            ly = max(y - 28, 2)
+
+            # Фон метки
+            try:
+                bbox = draw.textbbox((lx, ly), label_text, font=font_big)
+                lw = bbox[2] - bbox[0]
+                lh = bbox[3] - bbox[1]
+            except AttributeError:
+                lw, lh = 24, 20
+
+            draw.rectangle([lx, ly, lx + lw + 6, ly + lh + 4], fill=(220, 0, 0, 230))
+            draw.text((lx + 3, ly + 2), label_text, fill=(255, 255, 255, 255), font=font_big)
+
+            # Текст ссылки рядом с номером
+            if link_text:
+                tx = lx + lw + 10
+                draw.rectangle([tx, ly, tx + len(link_text) * 8 + 6, ly + lh + 4],
+                               fill=(40, 40, 40, 200))
+                draw.text((tx + 3, ly + 2), link_text, fill=(255, 255, 200, 255), font=font_small)
 
         result = Image.alpha_composite(img, overlay).convert("RGB")
         output_path.parent.mkdir(parents=True, exist_ok=True)
