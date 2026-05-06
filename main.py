@@ -27,9 +27,11 @@ from sitetester import runner
     metavar="SELECTOR",
     help="CSS selector to hide before screenshot (repeatable). E.g. -e '.chat-widget' -e '#cookie-bar'",
 )
-@click.option("--threshold", default=2.0, show_default=True, help="Pixel diff % above which differences are highlighted red (below = yellow).")
-@click.option("--no-mobile", is_flag=True, default=False, help="Skip mobile (375 px) screenshot checks.")
-def main(original_url, mirror_url, output, mode, max_pages, exclude, threshold, no_mobile):
+@click.option("--threshold", default=8.0, show_default=True, help="% пикселей diff: выше → красный, ниже → жёлтый.")
+@click.option("--blur",      default=4,   show_default=True, help="Радиус размытия перед сравнением (убирает пиксельные смещения).")
+@click.option("--sensitivity", default=25, show_default=True, help="Порог разницы пикселя (0-255).")
+@click.option("--no-mobile", is_flag=True, default=False, help="Не проверять мобильный вид (375px).")
+def main(original_url, mirror_url, output, mode, max_pages, exclude, threshold, blur, sensitivity, no_mobile):
     """
     Compare ORIGINAL_URL and MIRROR_URL page-by-page.
 
@@ -50,6 +52,8 @@ def main(original_url, mirror_url, output, mode, max_pages, exclude, threshold, 
         max_pages=max_pages,
         exclude_selectors=list(exclude),
         diff_threshold=threshold,
+        blur_radius=blur,
+        pixel_sensitivity=sensitivity,
         check_mobile=not no_mobile,
     )
     asyncio.run(runner.run(config))

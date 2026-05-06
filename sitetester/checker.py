@@ -1,89 +1,113 @@
-"""Link structure verification."""
+"""
+Проверка ссылочной структуры.
+  compare_links()       — сравнивает ссылки оригинала и зеркала по спискам из Playwright
+  check_broken_links()  — проверяет HTTP-статус внутренних ссылок зеркала
+"""
 import asyncio
 from typing import Any, Dict, List
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urlparse
 
 import aiohttp
-from bs4 import BeautifulSoup
 
-_IGNORE_SCHEMES = {"mailto:", "tel:", "javascript:", "data:"}
-_MAX_LINKS_TO_CHECK = 60
+_MAX_STATUS_CHECKS = 60
 
 
-def _extract_links(html: str, page_url: str, domain: str):
-    """Return (internal_links, external_links) as absolute URL sets."""
-    soup = BeautifulSoup(html, "lxml")
-    internal, external = set(), set()
-    for a in soup.find_all("a", href=True):
-        href = a["href"].strip()
-        if not href or any(href.startswith(s) for s in _IGNORE_SCHEMES):
-            continue
-        abs_url = urljoin(page_url, href).split("#")[0]
-        if not abs_url.startswith("http"):
-            continue
-        if urlparse(abs_url).netloc == domain:
-            internal.add(abs_url)
-        else:
-            external.add(abs_url)
-    return internal, external
-
-
-async def _check_status(session: aiohttp.ClientSession, url: str) -> int:
-    try:
-        async with session.head(
-            url,
-            timeout=aiohttp.ClientTimeout(total=6),
-            allow_redirects=True,
-        ) as r:
-            return r.status
-    except Exception:
-        return 0
-
-
-async def check_links(
-    session: aiohttp.ClientSession,
-    orig_html: str,
-    mirror_html: str,
-    orig_page_url: str,
-    mirror_page_url: str,
-    orig_domain: str,
+def compare_links(
+    orig_links:    List[Dict[str, Any]],
+    mirror_links:  List[Dict[str, Any]],
+    orig_domain:   str,
     mirror_domain: str,
+    mirror_base:   str,
 ) -> Dict[str, Any]:
-    """Verify link structure on the mirror page."""
-    mirror_internal, mirror_external = _extract_links(mirror_html, mirror_page_url, mirror_domain)
-    orig_internal, orig_external = _extract_links(orig_html, orig_page_url, orig_domain)
+    """
+    Для каждой ссылки оригинала проверяет, есть ли эквивалент на зеркале.
 
-    # Links on mirror that still point to original domain
-    wrong_domain: List[str] = []
-    soup = BeautifulSoup(mirror_html, "lxml")
-    for a in soup.find_all("a", href=True):
-        href = a["href"].strip()
-        if not href or any(href.startswith(s) for s in _IGNORE_SCHEMES):
-            continue
-        abs_url = urljoin(mirror_page_url, href).split("#")[0]
-        if urlparse(abs_url).netloc == orig_domain:
-            wrong_domain.append(abs_url)
+    Правила:
+      • Внутренняя ссылка orig_domain/path  → на зеркале должна быть mirror_domain/path
+      • Внешняя ссылка                      → должна присутствовать без изменений
+    """
+    # ── Строим lookup зеркала ────────────────────────────────────────────────
+    mirror_int_paths: set  = set()   # пути внутренних ссылок
+    mirror_ext_hrefs: set  = set()   # абсолютные URL внешних ссылок
+    wrong_domain_links: List[Dict] = []
 
-    # External links that exist on original but are missing/changed on mirror
-    orig_ext_paths = {urlparse(u).path for u in orig_external}
-    mirror_ext_paths = {urlparse(u).path for u in mirror_external}
-    missing_external = list(orig_ext_paths - mirror_ext_paths)
+    for lnk in mirror_links:
+        parsed = urlparse(lnk["abs_href"])
+        if parsed.netloc == mirror_domain:
+            mirror_int_paths.add(parsed.path.rstrip("/") or "/")
+        elif parsed.netloc == orig_domain:
+            # Ссылка на зеркале до сих пор ведёт на старый домен
+            wrong_domain_links.append(lnk)
+            # Считаем путь «присутствующим», чтобы не дублировать в missing
+            mirror_int_paths.add(parsed.path.rstrip("/") or "/")
+        elif parsed.scheme in ("http", "https") and parsed.netloc:
+            mirror_ext_hrefs.add(lnk["abs_href"])
 
-    # Check HTTP status for mirror internal links (sample to avoid hammering)
-    links_to_check = list(mirror_internal)[:_MAX_LINKS_TO_CHECK]
-    statuses = await asyncio.gather(*[_check_status(session, u) for u in links_to_check])
-    broken = [
-        {"url": u, "status": s}
-        for u, s in zip(links_to_check, statuses)
-        if s in (0, 404, 410) or s >= 500
-    ]
+    # ── Ищем отсутствующие ссылки ────────────────────────────────────────────
+    seen_int: set  = set()
+    seen_ext: set  = set()
+    missing: List[Dict] = []
 
-    issues = bool(broken or wrong_domain)
+    for lnk in orig_links:
+        href   = lnk["abs_href"]
+        parsed = urlparse(href)
+
+        if parsed.netloc == orig_domain:
+            path = parsed.path.rstrip("/") or "/"
+            if path in seen_int:
+                continue
+            seen_int.add(path)
+            if path not in mirror_int_paths:
+                missing.append({
+                    **lnk,
+                    "link_type":    "internal",
+                    "expected_url": mirror_base.rstrip("/") + (parsed.path or "/"),
+                })
+
+        elif parsed.scheme in ("http", "https") and parsed.netloc:
+            if href in seen_ext:
+                continue
+            seen_ext.add(href)
+            if href not in mirror_ext_hrefs:
+                missing.append({
+                    **lnk,
+                    "link_type":    "external",
+                    "expected_url": href,
+                })
+
     return {
-        "broken_links": broken,
-        "wrong_domain_links": wrong_domain[:20],
-        "missing_external": missing_external[:20],
-        "mirror_internal_count": len(mirror_internal),
-        "mirror_external_count": len(mirror_external),
-        "pass": not issues,
+        "missing_links":      missing,
+        "wrong_domain_links": wrong_domain_links[:25],
+        "pass": not missing and not wrong_domain_links,
     }
+
+
+async def check_broken_links(
+    session: aiohttp.ClientSession,
+    mirror_links: List[Dict[str, Any]],
+    mirror_domain: str,
+) -> List[Dict[str, Any]]:
+    """Проверяет HTTP-статус внутренних ссылок зеркала (не более 60 уникальных)."""
+    seen: set = set()
+    urls: List[str] = []
+    for lnk in mirror_links:
+        href = lnk["abs_href"]
+        if urlparse(href).netloc == mirror_domain and href not in seen:
+            seen.add(href)
+            urls.append(href)
+            if len(urls) >= _MAX_STATUS_CHECKS:
+                break
+
+    broken: List[Dict] = []
+    for url in urls:
+        try:
+            async with session.head(
+                url,
+                timeout=aiohttp.ClientTimeout(total=6),
+                allow_redirects=True,
+            ) as r:
+                if r.status == 404 or r.status >= 500:
+                    broken.append({"url": url, "status": r.status})
+        except Exception:
+            pass  # сетевые ошибки игнорируем при проверке статусов
+    return broken
